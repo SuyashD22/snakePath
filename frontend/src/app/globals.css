@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --wood-light: #C4915A;
+  --wood-dark: #5C3D1F;
+  --wood-darker: #3E2A14;
+  --wood-border: #2E1A0A;
+  --gold: #FFD700;
+  --green-btn: #4CAF50;
+  --green-btn-dark: #2E7D32;
+  --green-btn-light: #66BB6A;
+  --text-light: #FFF8E7;
+  --text-cream: #F5E6C8;
+  --font-display: 'Luckiest Guy', cursive;
+  --font-body: 'Outfit', sans-serif;
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { font-family: var(--font-body); color: var(--text-light); overflow-x: hidden; }
+
+/* ========== JUNGLE BACKGROUNDS ========== */
+.jungle-bg {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #1a3f2e 0%, #15352a 30%, #102a20 100%);
+  position: relative;
+}
+
+/* Rich jungle decorations — vines, leaves, undergrowth on both sides */
+.jungle-bg::before {
+  content: '';
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
+  background-image:
+    /* Left vines with branches */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 900'%3E%3Cpath d='M25,0 Q15,50 35,100 Q55,150 25,200 Q5,250 35,300 Q55,350 25,400 Q5,450 35,500 Q55,550 25,600 Q5,650 35,700 Q55,750 25,800 Q15,850 30,900' fill='none' stroke='%23143D2A' stroke-width='12' stroke-linecap='round'/%3E%3Cpath d='M25,0 Q15,50 35,100 Q55,150 25,200 Q5,250 35,300 Q55,350 25,400 Q5,450 35,500 Q55,550 25,600 Q5,650 35,700' fill='none' stroke='%231A5035' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M45,50 Q70,30 85,50 Q95,65 80,75' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M45,250 Q75,230 90,250' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M40,450 Q65,430 80,450' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M45,650 Q70,630 85,650' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cellipse cx='70' cy='50' rx='22' ry='11' fill='%23164A2E' transform='rotate(25,70,50)' opacity='0.8'/%3E%3Cellipse cx='85' cy='48' rx='18' ry='9' fill='%231B5C38' transform='rotate(30,85,48)' opacity='0.6'/%3E%3Cellipse cx='10' cy='170' rx='20' ry='10' fill='%23164A2E' transform='rotate(-15,10,170)' opacity='0.7'/%3E%3Cellipse cx='60' cy='250' rx='22' ry='11' fill='%23185530' transform='rotate(35,60,250)' opacity='0.8'/%3E%3Cellipse cx='15' cy='370' rx='18' ry='9' fill='%23164A2E' transform='rotate(-20,15,370)' opacity='0.7'/%3E%3Cellipse cx='55' cy='450' rx='24' ry='12' fill='%231B5C38' transform='rotate(20,55,450)' opacity='0.8'/%3E%3Cellipse cx='10' cy='560' rx='20' ry='10' fill='%23164A2E' transform='rotate(-25,10,560)' opacity='0.7'/%3E%3Cellipse cx='65' cy='650' rx='22' ry='11' fill='%23185530' transform='rotate(30,65,650)' opacity='0.8'/%3E%3Cellipse cx='15' cy='770' rx='18' ry='9' fill='%23164A2E' transform='rotate(-15,15,770)' opacity='0.7'/%3E%3Ccircle cx='60' cy='120' r='3' fill='%2300BFA5' opacity='0.5'/%3E%3Ccircle cx='20' cy='310' r='2' fill='%2340C4FF' opacity='0.4'/%3E%3Ccircle cx='50' cy='520' r='3' fill='%2300BFA5' opacity='0.5'/%3E%3Ccircle cx='25' cy='720' r='2' fill='%2340C4FF' opacity='0.4'/%3E%3C/svg%3E"),
+    /* Right vines with branches */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 900'%3E%3Cpath d='M155,0 Q165,50 145,100 Q125,150 155,200 Q175,250 145,300 Q125,350 155,400 Q175,450 145,500 Q125,550 155,600 Q175,650 145,700 Q125,750 155,800 Q165,850 150,900' fill='none' stroke='%23143D2A' stroke-width='12' stroke-linecap='round'/%3E%3Cpath d='M155,0 Q165,50 145,100 Q125,150 155,200 Q175,250 145,300 Q125,350 155,400 Q175,450 145,500 Q125,550 155,600 Q175,650 145,700' fill='none' stroke='%231A5035' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M135,100 Q110,80 95,100' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M140,300 Q115,280 100,300' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M135,500 Q110,480 95,500' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M140,700 Q115,680 100,700' fill='none' stroke='%23143D2A' stroke-width='4' stroke-linecap='round'/%3E%3Cellipse cx='110' cy='100' rx='22' ry='11' fill='%23164A2E' transform='rotate(-25,110,100)' opacity='0.8'/%3E%3Cellipse cx='170' cy='200' rx='20' ry='10' fill='%231B5C38' transform='rotate(20,170,200)' opacity='0.7'/%3E%3Cellipse cx='120' cy='300' rx='24' ry='12' fill='%23185530' transform='rotate(-35,120,300)' opacity='0.8'/%3E%3Cellipse cx='165' cy='420' rx='18' ry='9' fill='%23164A2E' transform='rotate(25,165,420)' opacity='0.7'/%3E%3Cellipse cx='115' cy='500' rx='22' ry='11' fill='%231B5C38' transform='rotate(-20,115,500)' opacity='0.8'/%3E%3Cellipse cx='170' cy='620' rx='20' ry='10' fill='%23164A2E' transform='rotate(30,170,620)' opacity='0.7'/%3E%3Cellipse cx='125' cy='700' rx='22' ry='11' fill='%23185530' transform='rotate(-25,125,700)' opacity='0.8'/%3E%3Cellipse cx='160' cy='830' rx='18' ry='9' fill='%23164A2E' transform='rotate(15,160,830)' opacity='0.7'/%3E%3Ccircle cx='120' cy='170' r='3' fill='%2300BFA5' opacity='0.5'/%3E%3Ccircle cx='160' cy='360' r='2' fill='%2340C4FF' opacity='0.4'/%3E%3Ccircle cx='130' cy='570' r='3' fill='%2300BFA5' opacity='0.5'/%3E%3Ccircle cx='155' cy='760' r='2' fill='%2340C4FF' opacity='0.4'/%3E%3C/svg%3E");
+  background-position: left top, right top;
+  background-repeat: repeat-y, repeat-y;
+  background-size: 120px auto, 120px auto;
+  opacity: 0.6;
+}
+
+/* Bottom undergrowth */
+.jungle-bg::after {
+  content: '';
+  position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
+  pointer-events: none; z-index: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(16,42,32,0.7) 50%, rgba(16,42,32,0.95) 100%);
+}
+
+.jungle-bg > * { position: relative; z-index: 1; }
+
+/* Remove number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* ========== PANELS ========== */
+.wood-banner {
+  background: linear-gradient(180deg, #5A8A3C 0%, #448A2A 30%, #3A7A22 70%, #2D6A1A 100%);
+  border: 3px solid #1E4A10;
+  border-radius: 12px;
+  padding: 12px 32px;
+  box-shadow: 0 4px 0 #1A3A10, var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.title-main {
+  font-family: var(--font-display); color: var(--gold);
+  text-shadow: 2px 2px 0 #8B6914, 4px 4px 0 rgba(0,0,0,0.4);
+  letter-spacing: 3px; line-height: 1.1;
+}
+.title-accent { color: #FF6B35; font-family: var(--font-display); }
+.subtitle { font-family: var(--font-display); color: var(--text-cream); text-shadow: 1px 1px 3px rgba(0,0,0,0.7); letter-spacing: 2px; }
+
+/* ========== BUTTONS ========== */
+.btn-primary {
+  font-family: var(--font-display); font-size: 1.5rem; padding: 16px 48px;
+  border: 2px solid #1B5E20; border-radius: 12px;
+  background: linear-gradient(180deg, var(--green-btn-light) 0%, var(--green-btn) 40%, var(--green-btn-dark) 100%);
+  color: white; cursor: pointer;
+  box-shadow: 0 6px 0 #1B5E20, var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.3);
+  transition: all 0.15s ease; letter-spacing: 2px; text-transform: uppercase;
+  text-shadow: 1px 2px 2px rgba(0,0,0,0.4); position: relative; top: 0;
+}
+.btn-primary:hover { top: -2px; filter: brightness(1.1); }
+.btn-primary:active { top: 4px; box-shadow: 0 2px 0 #1B5E20; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; top: 0; }
+
+.btn-wood {
+  font-family: var(--font-display); font-size: 0.85rem; padding: 7px 14px;
+  border: 2px solid var(--wood-border); border-radius: 10px;
+  background: linear-gradient(180deg, var(--wood-light) 0%, #A0764B 40%, var(--wood-dark) 100%);
+  color: var(--text-light); cursor: pointer;
+  box-shadow: 0 3px 0 var(--wood-border), var(--shadow-md);
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.4); text-transform: uppercase;
+  position: relative; top: 0; transition: all 0.15s ease;
+}
+.btn-wood:hover { top: -1px; filter: brightness(1.1); }
+.btn-wood:active { top: 2px; }
+
+/* ========== INPUTS ========== */
+.input-jungle {
+  font-family: var(--font-display); font-size: 2rem; padding: 12px 20px;
+  border: 3px solid var(--wood-dark); border-radius: 12px;
+  background: linear-gradient(180deg, #FFF8E7 0%, #F5E6C8 100%);
+  color: var(--wood-darker); text-align: center; width: 160px;
+  outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+.input-jungle:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,215,0,0.3), inset 0 2px 4px rgba(0,0,0,0.15); }
+
+/* ========== BOARD ========== */
+.board-container {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 3px var(--wood-border);
+  border: 4px solid var(--wood-dark);
+  background: var(--wood-border);
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+}
+
+.board-cell {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; cursor: default;
+  transition: filter 0.2s ease;
+  border-radius: 5px;
+}
+.board-cell:hover { filter: brightness(1.12); z-index: 2; }
+
+.cell-number {
+  font-family: var(--font-display);
+  font-size: clamp(0.75rem, 1.8vw, 1.15rem);
+  color: white; text-shadow: 1px 1px 3px rgba(0,0,0,0.7); z-index: 1;
+}
+
+/* ========== PAWNS ========== */
+.pawns-container {
+  display: flex; flex-wrap: wrap; gap: 1px;
+  position: absolute; bottom: 1px; right: 1px;
+  max-width: 90%; z-index: 10;
+}
+
+/* ========== GAME PANELS ========== */
+.game-panel {
+  background: linear-gradient(180deg, #A0764B 0%, #8B6914 20%, #6B4226 80%, #5C3D1F 100%);
+  border: 3px solid var(--wood-border);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 3px 0 var(--wood-border), var(--shadow-lg);
+  color: var(--text-light);
+}
+
+.panel-title {
+  font-family: var(--font-display); font-size: 0.9rem;
+  color: var(--gold); text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+  text-align: center; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+}
+
+.player-indicator {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 6px;
+  transition: all 0.3s ease;
+}
+.player-indicator.active {
+  background: rgba(255,215,0,0.15);
+  border: 1px solid rgba(255,215,0,0.3);
+}
+
+/* ========== GAME LOG ========== */
+.game-log {
+  background: rgba(0,0,0,0.25); border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 6px; padding: 6px 8px;
+  max-height: 100px; overflow-y: auto;
+  font-family: var(--font-body); font-size: 0.7rem; color: var(--text-cream);
+}
+.game-log::-webkit-scrollbar { width: 3px; }
+.game-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+.log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+/* ========== ANIMATIONS ========== */
+@keyframes diceRoll {
+  0% { transform: rotateX(0) rotateY(0) scale(1); }
+  25% { transform: rotateX(180deg) rotateY(90deg) scale(0.85); }
+  50% { transform: rotateX(360deg) rotateY(180deg) scale(1.1); }
+  75% { transform: rotateX(540deg) rotateY(270deg) scale(0.9); }
+  100% { transform: rotateX(720deg) rotateY(360deg) scale(1); }
+}
+
+.board-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 5;
+}
+
+/* ========== WINNER ========== */
+.winner-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; backdrop-filter: blur(6px);
+}
+.winner-card {
+  background: linear-gradient(180deg, #A0764B 0%, #6B4226 100%);
+  border: 4px solid var(--gold); border-radius: 24px; padding: 40px;
+  text-align: center; box-shadow: 0 0 60px rgba(255,215,0,0.3); max-width: 450px;
+}
+
+/* ========== PLAY PAGE ========== */
+.play-page {
+  height: 100vh; padding: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  overflow: hidden;
+}
+
+/* ========== HOME PAGE ========== */
+.home-page {
+  min-height: 100vh;
+  background-image: url('/home-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative;
+}
+.home-page::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 0;
+}
+.home-page > * { position: relative; z-index: 1; }
