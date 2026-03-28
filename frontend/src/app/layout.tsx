@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Snake & Ladder Adventure',
-  description: 'A fun, cartoon-style Snake & Ladder adventure game. Play with up to 20 friends!',
+  title: 'DS&A Adventure: Technical Edition',
+  description: 'A Data Structures & Algorithms adventure game. Master concepts through interactive gameplay!',
 };
 
 export default function RootLayout({
@@ -13,8 +13,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      </head>
       <body>
-        <div className="jungle-bg">
+        <div className="tech-bg">
           {children}
         </div>
       </body>
