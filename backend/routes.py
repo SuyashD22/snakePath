@@ -1,161 +1,170 @@
-import uuid
 from fastapi import APIRouter, HTTPException
-from models import GameCreate, GameState, PlayerState, MoveRequest, MoveResponse, SnakeLadder
-from game_logic import (
-    generate_snakes_and_ladders,
-    roll_dice,
-    apply_move,
-    PLAYER_COLORS,
-    PLAYER_NAMES,
+from database import get_connection, release_connection
+from models import (
+    GameSetup, GameState, TeamConfig, PendingApproval, 
+    RollSubmit, VerdictRequest
 )
-from database import get_supabase, is_db_available
 
 router = APIRouter(prefix="/api")
 
-# In-memory game store (used when Supabase is not configured)
-games_store: dict[str, GameState] = {}
-
-
-def _save_game_to_db(game: GameState):
-    """Persist game state to Supabase if available."""
-    db = get_supabase()
-    if not db:
-        return
-
-    game_data = {
-        "id": game.id,
-        "num_players": game.num_players,
-        "current_turn": game.current_turn,
-        "snakes": [s.model_dump() for s in game.snakes],
-        "ladders": [l.model_dump() for l in game.ladders],
-        "status": game.status,
-    }
-
+@router.get("/state", response_model=GameState)
+async def get_state():
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="DB Error")
+    
     try:
-        db.table("games").upsert(game_data).execute()
-
-        for player in game.players:
-            player_data = {
-                "id": player.id,
-                "game_id": game.id,
-                "player_index": player.player_index,
-                "name": player.name,
-                "color": player.color,
-                "position": player.position,
-                "has_won": player.has_won,
-            }
-            db.table("players").upsert(player_data).execute()
-    except Exception as e:
-        print(f"DB save error (falling back to memory): {e}")
-
-
-@router.post("/games", response_model=GameState)
-async def create_game(game_input: GameCreate):
-    """Create a new game session with generated snakes and ladders."""
-    game_id = str(uuid.uuid4())
-    snakes, ladders = generate_snakes_and_ladders()
-
-    players = []
-    for i in range(game_input.num_players):
-        player = PlayerState(
-            id=str(uuid.uuid4()),
-            game_id=game_id,
-            player_index=i,
-            name=PLAYER_NAMES[i],
-            color=PLAYER_COLORS[i % len(PLAYER_COLORS)],
-            position=0,
-            has_won=False,
+        cursor = conn.cursor()
+        # Read game_config
+        cursor.execute("SELECT num_teams, game_started FROM game_config WHERE id=1;")
+        config_row = cursor.fetchone()
+        num_teams = config_row[0] if config_row else 3
+        game_started = config_row[1] if config_row else False
+        
+        # Read teams
+        cursor.execute("SELECT id, name, password, color, avatar, position, dice_unlocked, waiting_for_approval FROM teams ORDER BY id;")
+        teams = []
+        for row in cursor.fetchall():
+            teams.append(TeamConfig(
+                id=row[0], name=row[1], password=row[2], color=row[3], avatar=row[4],
+                position=row[5], diceUnlocked=row[6], waitingForApproval=row[7]
+            ))
+            
+        # Read pending_approvals
+        cursor.execute("SELECT id, team_id, team_name, team_color, roll, from_position, question_id, question_title, question_difficulty, question_link, timestamp FROM pending_approvals ORDER BY timestamp ASC;")
+        pending = []
+        for row in cursor.fetchall():
+            pending.append(PendingApproval(
+                id=row[0], teamId=row[1], teamName=row[2], teamColor=row[3], roll=row[4],
+                fromPosition=row[5], questionId=row[6], questionTitle=row[7],
+                questionDifficulty=row[8], questionLink=row[9], timestamp=row[10]
+            ))
+            
+        conn.commit()
+        cursor.close()
+        return GameState(
+            numTeams=num_teams,
+            gameStarted=game_started,
+            teams=teams,
+            pendingApprovals=pending
         )
-        players.append(player)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            release_connection(conn)
 
-    game = GameState(
-        id=game_id,
-        num_players=game_input.num_players,
-        current_turn=0,
-        snakes=snakes,
-        ladders=ladders,
-        status="active",
-        players=players,
-    )
+@router.post("/admin/setup")
+async def setup_game(setup: GameSetup):
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="DB Error")
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Reset current tables
+        cursor.execute("TRUNCATE TABLE teams CASCADE;")
+        cursor.execute("TRUNCATE TABLE pending_approvals CASCADE;")
+        
+        # Update config
+        cursor.execute("UPDATE game_config SET num_teams = %s, game_started = %s WHERE id = 1;", 
+                       (setup.numTeams, setup.gameStarted))
+                       
+        # Insert new teams
+        for t in setup.teams:
+            cursor.execute("""
+                INSERT INTO teams (id, name, password, color, avatar, position, dice_unlocked, waiting_for_approval)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (t.id, t.name, t.password, t.color, t.avatar, t.position, t.diceUnlocked, t.waitingForApproval))
+            
+        conn.commit()
+        cursor.close()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            release_connection(conn)
 
-    # Store in memory
-    games_store[game_id] = game
+@router.post("/admin/reset")
+async def reset_game():
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="DB Error")
+    try:
+        cursor = conn.cursor()
+        cursor.execute("TRUNCATE TABLE teams CASCADE;")
+        cursor.execute("TRUNCATE TABLE pending_approvals CASCADE;")
+        cursor.execute("UPDATE game_config SET num_teams = 3, game_started = FALSE WHERE id = 1;")
+        conn.commit()
+        cursor.close()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            release_connection(conn)
 
-    # Also persist to DB if available
-    _save_game_to_db(game)
+@router.post("/team/roll")
+async def log_roll(roll: RollSubmit):
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="DB Error")
+        
+    try:
+        cursor = conn.cursor()
+        # Ensure we only log one roll per team
+        cursor.execute("DELETE FROM pending_approvals WHERE team_id = %s;", (roll.teamId,))
+        
+        cursor.execute("""
+            INSERT INTO pending_approvals (team_id, team_name, team_color, roll, from_position, question_id, question_title, question_difficulty, question_link, timestamp)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            roll.teamId, roll.teamName, roll.teamColor, roll.roll, roll.fromPosition, 
+            roll.questionId, roll.questionTitle, roll.questionDifficulty, roll.questionLink, roll.timestamp
+        ))
+        
+        # Update team state
+        cursor.execute("""
+            UPDATE teams SET dice_unlocked = FALSE, waiting_for_approval = TRUE WHERE id = %s
+        """, (roll.teamId,))
+        
+        conn.commit()
+        cursor.close()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            release_connection(conn)
 
-    return game
-
-
-@router.get("/games/{game_id}", response_model=GameState)
-async def get_game(game_id: str):
-    """Get the current state of a game."""
-    game = games_store.get(game_id)
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
-    return game
-
-
-@router.post("/games/{game_id}/roll", response_model=MoveResponse)
-async def roll_and_move(game_id: str, move: MoveRequest):
-    """Roll dice for a player and apply the move."""
-    game = games_store.get(game_id)
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
-
-    if game.status != "active":
-        raise HTTPException(status_code=400, detail="Game is not active")
-
-    if move.player_index != game.current_turn:
-        raise HTTPException(status_code=400, detail="Not this player's turn")
-
-    player = game.players[move.player_index]
-    if player.has_won:
-        raise HTTPException(status_code=400, detail="Player has already won")
-
-    dice_value = roll_dice()
-    old_position = player.position
-
-    new_position, final_position, hit_snake, hit_ladder, snake_or_ladder = apply_move(
-        old_position, dice_value, game.snakes, game.ladders
-    )
-
-    player.position = final_position
-    has_won = final_position == 100
-    player.has_won = has_won
-
-    if has_won:
-        game.status = "finished"
-    else:
-        # Move to next player's turn (skip players who have won)
-        next_turn = (game.current_turn + 1) % game.num_players
-        attempts = 0
-        while game.players[next_turn].has_won and attempts < game.num_players:
-            next_turn = (next_turn + 1) % game.num_players
-            attempts += 1
-        game.current_turn = next_turn
-
-    # Persist to DB
-    _save_game_to_db(game)
-
-    return MoveResponse(
-        dice_value=dice_value,
-        player_index=move.player_index,
-        old_position=old_position,
-        new_position=new_position,
-        final_position=final_position,
-        hit_snake=hit_snake,
-        hit_ladder=hit_ladder,
-        snake_or_ladder=snake_or_ladder,
-        has_won=has_won,
-        next_turn=game.current_turn,
-    )
-
-
-@router.get("/games/{game_id}/players", response_model=list[PlayerState])
-async def get_players(game_id: str):
-    """Get all players in a game."""
-    game = games_store.get(game_id)
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
-    return game.players
+@router.post("/admin/verdict")
+async def roll_verdict(verdict: VerdictRequest):
+    conn = get_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="DB Error")
+        
+    try:
+        cursor = conn.cursor()
+        
+        # Update team position and reset dice
+        cursor.execute("""
+            UPDATE teams SET position = %s, dice_unlocked = TRUE, waiting_for_approval = FALSE WHERE id = %s
+        """, (verdict.newPos, verdict.teamId))
+        
+        # Delete from pending
+        cursor.execute("DELETE FROM pending_approvals WHERE team_id = %s;", (verdict.teamId,))
+        
+        conn.commit()
+        cursor.close()
+        return {"status": "success"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            release_connection(conn)

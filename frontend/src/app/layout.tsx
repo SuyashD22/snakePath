@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'DS&A Adventure: Technical Edition',
-  description: 'A Data Structures & Algorithms adventure game. Master concepts through interactive gameplay!',
+  title: 'Snake & Ladder: DSA Edition',
+  description: 'A Data Structures & Algorithms competition game. Race to square 100 by answering DSA questions!',
+  icons: { icon: '/favicon.png' },
 };
 
 export default function RootLayout({

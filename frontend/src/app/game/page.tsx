@@ -3,12 +3,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import CircuitBackground from '@/components/CircuitBackground';
 import {
-  GameConfig, TeamConfig, TeamPosition,
+  GameConfig, TeamConfig, GameState,
   SNAKES, LADDERS, TEAM_COLORS, BROADCAST_CHANNEL,
-  loadGameConfig, loadTeamPositions, saveTeamPositions,
-  loadDiceStates, saveDiceStates,
-  loadPendingApprovals, savePendingApprovals,
-  applySnakeOrLadder,
+  fetchGameState, submitRollDB
 } from '@/lib/gameStore';
 import { getQuestionForPosition, Question } from '@/lib/questions';
 
@@ -176,7 +173,7 @@ export default function GamePage() {
   const router = useRouter();
   const [myTeam, setMyTeam] = useState<TeamConfig | null>(null);
   const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
-  const [positions, setPositions] = useState<TeamPosition[]>([]);
+  const [positions, setPositions] = useState<{teamId: number, position: number}[]>([]);
   const [diceUnlocked, setDiceUnlocked] = useState(true);
   const [waitingAdmin, setWaitingAdmin] = useState(false);
   const [rolling, setRolling] = useState(false);
@@ -194,6 +191,10 @@ export default function GamePage() {
 
   const myPos = positions.find(p => p.teamId === myTeam?.id)?.position ?? 0;
 
+  // We use a ref so the fetch closure can access the latest state without triggering re-runs
+  const uiState = useRef({ diceUnlocked, waitingAdmin });
+  useEffect(() => { uiState.current = { diceUnlocked, waitingAdmin }; }, [diceUnlocked, waitingAdmin]);
+
   useEffect(() => {
     const u = (() => { try { return JSON.parse(sessionStorage.getItem('snakeUser')||'null'); } catch { return null; } })();
     if (!u || u.role !== 'contestant') { router.push('/login'); return; }
@@ -201,54 +202,45 @@ export default function GamePage() {
 
     channelRef.current = new BroadcastChannel(BROADCAST_CHANNEL);
 
-    function initFromConfig(cfg: GameConfig, userId: number) {
-      const team = cfg.teams.find((t: TeamConfig) => t.id === userId);
-      if (!team) { router.push('/login'); return; }
-      setMyTeam(team);
-      setGameConfig(cfg);
-      const pos = loadTeamPositions();
-      setPositions(pos.length ? pos : cfg.teams.map((t: TeamConfig) => ({ teamId: t.id, position: 0 })));
-      const ds = loadDiceStates();
-      const myDs = ds.find((d: any) => d.teamId === team.id);
-      if (myDs) { setDiceUnlocked(myDs.diceUnlocked); setWaitingAdmin(myDs.waitingForApproval); }
-      setWaitingRoom(false);
+    async function fetchAndSync() {
+      const state = await fetchGameState();
+      if (state && state.gameStarted) {
+        setWaitingRoom(false);
+        setGameConfig({ numTeams: state.numTeams, teams: state.teams, gameStarted: state.gameStarted });
+        setPositions(state.teams.map(t => ({ teamId: t.id, position: t.position || 0 })));
+        
+        const myTeamData = state.teams.find(t => t.id === u.teamNumber);
+        if (!myTeamData) { router.push('/login'); return; }
+        
+        // Clear question UI if we were waiting but admin replied
+        if (!myTeamData.waitingForApproval && uiState.current.diceUnlocked === false && uiState.current.waitingAdmin === true) {
+            setShowQuestion(false);
+            setRolledNum(null);
+            setLog(l => [`${new Date().toLocaleTimeString()} — Score Updated by Admin`, ...l].slice(0, 30));
+        }
 
-      channelRef.current!.onmessage = (e) => {
-        const { type, payload } = e.data;
-        if (type === 'POSITION_SYNC') { setPositions(payload); }
-        if (type === 'DICE_APPROVED' && payload.teamId === team.id) {
-          setPositions(prev => prev.map(p => p.teamId === team.id ? { ...p, position: payload.newPos } : p));
-          setDiceUnlocked(true); setWaitingAdmin(false); setShowQuestion(false); setRolledNum(null);
-          addLog(`Approved! Moved to square ${payload.newPos}${payload.event==='snake'?' — Snake! Sliding down':payload.event==='ladder'?' — Ladder! Climbing up':''}`);
-          if (payload.newPos === 100) setWinner(team);
-        }
-        if (type === 'DICE_REJECTED' && payload.teamId === team.id) {
-          // Move back by penalty — admin already calculated newPos (no snake/ladder on penalty)
-          if (payload.newPos !== undefined) {
-            setPositions(prev => prev.map(p => p.teamId === team.id ? { ...p, position: payload.newPos } : p));
-            addLog(`⚠ Roll rejected! -${payload.penalty} step penalty → moved to square ${payload.newPos}`);
-          } else {
-            addLog('⚠ Roll rejected by admin. Try again.');
-          }
-          setDiceUnlocked(true); setWaitingAdmin(false); setShowQuestion(false); setRolledNum(null);
-        }
-        if (type === 'GAME_RESET') { router.push('/login'); }
-      };
+        setMyTeam(myTeamData);
+        setDiceUnlocked(!!myTeamData.diceUnlocked);
+        setWaitingAdmin(!!myTeamData.waitingForApproval);
+
+        // Check winner
+        const win = state.teams.find(t => t.position && t.position >= 100);
+        if (win) setWinner(win);
+        
+        // Notify admin of presence
+        channelRef.current?.postMessage({ type: 'CONTESTANT_JOINED', payload: { teamId: u.teamNumber } });
+      } else {
+        setWaitingRoom(true);
+      }
     }
 
-    const cfg = loadGameConfig();
-    if (cfg?.gameStarted) {
-      initFromConfig(cfg, u.teamNumber);
-    } else {
-      // Game not started yet — show waiting room
-      setWaitingRoom(true);
-      channelRef.current.onmessage = (e) => {
-        if (e.data.type === 'GAME_STARTED') {
-          initFromConfig(e.data.payload, u.teamNumber);
-        }
-        if (e.data.type === 'GAME_RESET') { router.push('/login'); }
-      };
-    }
+    channelRef.current!.onmessage = (e) => {
+      const { type } = e.data;
+      if (type === 'DB_UPDATED' || type === 'GAME_STARTED') { fetchAndSync(); }
+      if (type === 'GAME_RESET') { router.push('/login'); }
+    };
+
+    fetchAndSync();
 
     return () => channelRef.current?.close();
   }, []);
@@ -262,11 +254,11 @@ export default function GamePage() {
     setRolling(true);
     let ticks = 0;
     const iv = setInterval(() => {
-      setDiceDisplay(Math.ceil(Math.random() * 3));
+      setDiceDisplay(Math.ceil(Math.random() * 60));
       ticks++;
       if (ticks >= 12) {
         clearInterval(iv);
-        const roll = Math.ceil(Math.random() * 3);
+        const roll = Math.ceil(Math.random() * 60);
         setDiceDisplay(roll);
         setRolledNum(roll);
         setRolling(false);
@@ -288,7 +280,7 @@ export default function GamePage() {
     }, 80);
   }, [diceUnlocked, rolling, waitingAdmin, myTeam, myPos]);
 
-  function submitForReview() {
+  async function submitForReview() {
     if (!myTeam || !question || rolledNum === null) return;
     const approval = {
       teamId: myTeam.id, teamName: myTeam.name, teamColor: myTeam.color,
@@ -297,12 +289,12 @@ export default function GamePage() {
       questionDifficulty: question.difficulty, questionLink: question.link,
       timestamp: Date.now(),
     };
-    const pending = [...loadPendingApprovals(), approval];
-    savePendingApprovals(pending);
-    channelRef.current?.postMessage({ type: 'DICE_ROLLED', payload: approval });
+    
     setDiceUnlocked(false);
     setWaitingAdmin(true);
     addLog('Submitted for admin review. Waiting...');
+    
+    await submitRollDB(approval);
   }
 
   const sortedBoard = gameConfig
@@ -424,7 +416,6 @@ export default function GamePage() {
                     <div style={{ width: 52, height: 52, borderRadius: 10, border: '2px solid rgba(0,245,255,0.4)', background: 'rgba(0,245,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 900, color: '#00f5ff', flexShrink: 0 }}>{rolledNum}</div>
                     <div>
                       <div style={{ fontSize: 10, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>QUESTION #{rolledNum}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Answer to move forward · Wrong answer = penalty steps</div>
                     </div>
                   </div>
 
@@ -533,13 +524,21 @@ export default function GamePage() {
         </div>
       )}
 
-      {/* Winner overlay */}
+      {/* Winner overlay with confetti */}
       {winner && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(6px)' }}>
-          <div style={{ textAlign: 'center', padding: '50px 60px', borderRadius: 20, background: 'rgba(4,15,30,0.97)', border: `2px solid ${winner.color}`, maxWidth: 400 }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: 16 }}>🏆</div>
-            <div style={{ fontSize: 10, letterSpacing: '0.3em', color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>WINNER</div>
-            <div style={{ fontSize: '2.4rem', color: winner.color, fontWeight: 900 }}>{winner.name}</div>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
+          <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: 'clamp(3rem,8vw,6rem)', fontWeight: 900, letterSpacing: '0.05em', background: `linear-gradient(135deg, ${winner.color}, #ffd700, ${winner.color})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'winnerPulse 1.5s ease-in-out infinite', marginBottom: 12 }}>WINNER!</div>
+            <div style={{ fontSize: '3rem', marginBottom: 8 }}>{winner.avatar}</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 800, color: winner.color, marginBottom: 6 }}>{winner.name}</div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 32 }}>has reached square 100!</div>
+            <button onClick={() => setWinner(null)} style={{ padding: '12px 40px', borderRadius: 8, border: `1px solid ${winner.color}`, background: `${winner.color}15`, color: winner.color, cursor: 'pointer', fontSize: 13, fontWeight: 700, letterSpacing: '0.1em', fontFamily: "'Space Grotesk',sans-serif" }}>CONTINUE</button>
+          </div>
+          {/* Confetti */}
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+            {Array.from({ length: 50 }).map((_, i) => (
+              <div key={i} style={{ position: 'absolute', left: `${Math.random() * 100}%`, top: '-20px', width: `${6 + Math.random() * 8}px`, height: `${6 + Math.random() * 8}px`, borderRadius: Math.random() > 0.5 ? '50%' : '2px', background: [winner.color,'#ffd700','#00ff88','#00f5ff','#c084fc','#ff4d6d'][Math.floor(Math.random()*6)], animation: `confettiFall ${2 + Math.random() * 3}s ${Math.random() * 2}s linear infinite`, transform: `rotate(${Math.random()*360}deg)` }} />
+            ))}
           </div>
         </div>
       )}
@@ -547,6 +546,8 @@ export default function GamePage() {
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
         @keyframes diceRoll{0%{transform:scale(1)}50%{transform:scale(.88)}100%{transform:scale(1)}}
+        @keyframes winnerPulse{0%,100%{transform:scale(1) rotate(-1deg)}50%{transform:scale(1.06) rotate(1deg)}}
+        @keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
         input::placeholder{color:rgba(255,255,255,0.2)}
       `}</style>
     </div>

@@ -16,7 +16,7 @@ export default function HomePage() {
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 18 }}>
             <div style={{ width: 80, height: 1, background: 'linear-gradient(90deg,transparent,#00f5ff)' }} />
-            <span style={{ fontSize: 11, letterSpacing: '0.35em', color: 'rgba(0,245,255,0.5)' }}>SYSTEM BOOT · v2.0.1</span>
+            <span style={{ fontSize: 11, letterSpacing: '0.35em', color: 'rgba(0,245,255,0.5)' }}>ENIGMA</span>
             <div style={{ width: 80, height: 1, background: 'linear-gradient(90deg,#00f5ff,transparent)' }} />
           </div>
 

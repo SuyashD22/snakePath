@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import CircuitBackground from '@/components/CircuitBackground';
+import { fetchGameState } from '@/lib/gameStore';
 
-const ADMIN_PASSWORD = 'admin@dsa2025';
+const ADMIN_PASSWORD = 'admin@dsa2026';
 
 const TEAM_COLORS = [
   '#ff4d6d','#00c8ff','#ffd700','#c084fc','#00ff88',
@@ -28,13 +29,16 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  const handleRoleSelect = (r: string) => {
+  const handleRoleSelect = async (r: string) => {
     setRole(r); setError(''); setPassword(''); setSelectedTeam(null);
     if (r === 'contestant') {
       try {
-        const raw = localStorage.getItem('snl_game_config');
-        if (raw) { const cfg: GameConfig = JSON.parse(raw); setGameConfig(cfg.gameStarted ? cfg : null); }
-        else setGameConfig(null);
+        const state = await fetchGameState();
+        if (state && state.gameStarted) {
+          setGameConfig({ numTeams: state.numTeams, teams: state.teams, gameStarted: state.gameStarted });
+        } else {
+          setGameConfig(null);
+        }
       } catch { setGameConfig(null); }
     }
   };
@@ -94,7 +98,7 @@ export default function LoginPage() {
                 <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: c }} />
               )}
             </div>
-            <span style={{ fontSize: 12, letterSpacing: '0.15em', color: 'rgba(0,245,255,0.6)' }}>AUTH_PORTAL.init</span>
+            <span style={{ fontSize: 12, letterSpacing: '0.15em', color: 'rgba(0,245,255,0.6)' }}>AUTH_PORTAL</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(0,212,170,0.8)' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00d4aa', animation: 'pulse 2s infinite' }} />
               <span>SECURE</span>
