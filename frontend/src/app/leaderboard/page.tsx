@@ -38,7 +38,7 @@ export default function LeaderboardPage() {
     <div style={{ background: 'transparent', minHeight: '100vh', color: '#fff', fontFamily: "'Space Grotesk',sans-serif", overflow: 'hidden' }}>
       <CircuitBackground />
 
-      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '40px 60px' }}>
+      <div className="leaderboard-container" style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '40px 60px' }}>
 
         <button onClick={() => router.push('/admin')}
           style={{ position: 'absolute', top: 32, left: 60, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 11, letterSpacing: '0.12em', fontFamily: "'Space Grotesk',sans-serif", zIndex: 10 }}>
@@ -87,7 +87,7 @@ export default function LeaderboardPage() {
 
         {/* Rest of teams */}
         <div style={{ background: 'rgba(4,12,24,0.55)', border: '1px solid rgba(255,200,0,0.15)', borderRadius: 14, padding: '16px 20px', backdropFilter: 'blur(4px)' }}>
-          {teams.slice(3).map((team, idx) => (
+          {teams.slice(3, 7).map((team, idx) => (
             <div key={team.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 14px', marginBottom: 6, borderRadius: 8, border: `1px solid ${team.color}20`, background: `${team.color}06`, position: 'relative', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: team.color }} />
               <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', minWidth: 28, marginLeft: 8 }}>{idx + 4}.</span>
@@ -111,7 +111,12 @@ export default function LeaderboardPage() {
         </div>
       </div>
 
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+      <style>{`
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        @media (max-width: 768px) {
+          .leaderboard-container { padding: 20px 20px !important; }
+        }
+      `}</style>
     </div>
   );
 }

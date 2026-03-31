@@ -105,8 +105,13 @@ export default function AdminPage() {
     if (newPos > 100) newPos = 100;
     const { pos: finalPos, event } = applySnakeOrLadder(newPos);
 
-    // Call DB wrapper (triggers broadcast DB_UPDATED internally)
-    await approveRollDB(approval.teamId, finalPos);
+    // Optimistic UI updates
+    setPending(prev => prev.filter(p => p.teamId !== approval.teamId));
+    setPositions(prev => prev.map(p => p.teamId === approval.teamId ? { ...p, position: finalPos } : p));
+    setDiceStates(prev => prev.map(d => d.teamId === approval.teamId ? { ...d, diceUnlocked: true, waitingForApproval: false } : d));
+
+    // Fire and forget
+    approveRollDB(approval.teamId, finalPos).catch(console.error);
     
     const evtMsg = event === 'snake' ? ' Snake!' : event === 'ladder' ? ' Ladder!' : '';
     addLog(`Approved ${approval.teamName} → pos ${finalPos}${evtMsg}`);
@@ -122,7 +127,14 @@ export default function AdminPage() {
     const currentPos = positions.find(p => p.teamId === approval.teamId)?.position ?? 0;
     const newPos = Math.max(0, currentPos - penalty);
 
-    await approveRollDB(approval.teamId, newPos);
+    // Optimistic UI updates
+    setPending(prev => prev.filter(p => p.teamId !== approval.teamId));
+    setPositions(prev => prev.map(p => p.teamId === approval.teamId ? { ...p, position: newPos } : p));
+    setDiceStates(prev => prev.map(d => d.teamId === approval.teamId ? { ...d, diceUnlocked: true, waitingForApproval: false } : d));
+
+    // Fire and forget
+    approveRollDB(approval.teamId, newPos).catch(console.error);
+    
     addLog(`⚠ Rejected ${approval.teamName} — penalty -${penalty} steps → pos ${newPos}`);
   }
 
@@ -253,7 +265,7 @@ export default function AdminPage() {
             {/* Leaderboard sidebar */}
             <div style={{ width: 360, flexShrink: 0, borderRight: '1px solid rgba(255,200,0,0.15)', padding: 16, overflowY: 'auto', background: 'rgba(0,0,0,0.5)' }}>
               <div style={{ fontSize: 10, letterSpacing: '0.18em', color: 'rgba(255,200,0,0.9)', fontWeight: 700, marginBottom: 14 }}>// LEADERBOARD</div>
-              {sortedLeaderboard.slice(0, 5).map((team, rank) => {
+              {sortedLeaderboard.slice(0, 7).map((team, rank) => {
                 const pos = positions.find(p => p.teamId === team.id)?.position ?? 0;
                 return (
                   <div key={team.id} style={{ padding: '10px 10px 10px 14px', marginBottom: 8, borderRadius: 5, border: `1px solid ${team.color}25`, background: `${team.color}07`, position: 'relative', overflow: 'hidden' }}>
@@ -271,8 +283,8 @@ export default function AdminPage() {
                   </div>
                 );
               })}
-              {sortedLeaderboard.length > 5 && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', paddingTop: 4, letterSpacing: '0.1em' }}>+{sortedLeaderboard.length - 5} more teams</div>
+              {sortedLeaderboard.length > 7 && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', paddingTop: 4, letterSpacing: '0.1em' }}>+{sortedLeaderboard.length - 7} more teams</div>
               )}
             </div>
 

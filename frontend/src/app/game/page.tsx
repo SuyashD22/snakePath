@@ -290,11 +290,13 @@ export default function GamePage() {
       timestamp: Date.now(),
     };
     
+    // Optimistic UI updates
     setDiceUnlocked(false);
     setWaitingAdmin(true);
     addLog('Submitted for admin review. Waiting...');
     
-    await submitRollDB(approval);
+    // Fire and forget so we don't block the UI
+    submitRollDB(approval).catch(console.error);
   }
 
   const sortedBoard = gameConfig
@@ -344,10 +346,10 @@ export default function GamePage() {
     <div style={{ background: '#000', minHeight: '100vh', color: '#fff', fontFamily: "'Space Grotesk',sans-serif", overflow: 'hidden' }}>
       <CircuitBackground />
       <div style={{ position: 'relative', zIndex: 1, height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
-        <div style={{ display: 'flex', gap: 0, border: '1px solid rgba(30,100,255,0.2)', borderLeft: '2px solid rgba(30,100,255,0.6)', borderRadius: 4, overflow: 'hidden', height: 'calc(100vh - 20px)', maxHeight: 820, width: '100%', maxWidth: 1280 }}>
+        <div className="game-container" style={{ display: 'flex', gap: 0, border: '1px solid rgba(30,100,255,0.2)', borderLeft: '2px solid rgba(30,100,255,0.6)', borderRadius: 4, overflow: 'hidden', height: 'calc(100vh - 20px)', maxHeight: 820, width: '100%', maxWidth: 1280 }}>
 
           {/* ── LEFT PANEL ── */}
-          <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid rgba(30,100,255,0.2)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', overflowY: 'auto' }}>
+          <div className="left-panel" style={{ width: 200, flexShrink: 0, borderRight: '1px solid rgba(30,100,255,0.2)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', overflowY: 'auto' }}>
             {/* My Team */}
             <div style={{ padding: 14, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize: 9, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>// MY TEAM</div>
@@ -376,7 +378,7 @@ export default function GamePage() {
                 <span style={{ fontSize: 9, letterSpacing: '0.18em', color: 'rgba(255,210,0,0.85)', fontWeight: 700 }}>// LEADERBOARD</span>
                 <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00ff88', animation: 'pulse 2s infinite', marginLeft: 'auto', flexShrink: 0 }} />
               </div>
-              {sortedBoard.slice(0, 5).map((team, rank) => {
+              {sortedBoard.slice(0, 7).map((team, rank) => {
                 const pos = positions.find(p => p.teamId === team.id)?.position ?? 0;
                 const isMe = team.id === myTeam.id;
                 return (
@@ -393,14 +395,14 @@ export default function GamePage() {
                   </div>
                 );
               })}
-              {sortedBoard.length > 5 && (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center', paddingTop: 4, letterSpacing: '0.1em' }}>+{sortedBoard.length - 5} more</div>
+              {sortedBoard.length > 7 && (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center', paddingTop: 4, letterSpacing: '0.1em' }}>+{sortedBoard.length - 7} more</div>
               )}
             </div>
           </div>
 
           {/* ── CENTER BOARD ── */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+          <div className="center-board" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
             <div style={{ position: 'relative', width: 'min(100%, min(calc(100vh - 40px), 720px))', aspectRatio: '1', flexShrink: 0 }}>
               <BoardSVG players={(gameConfig?.teams ?? []).map((t: TeamConfig) => ({
                 id: t.id, position: positions.find(p => p.teamId === t.id)?.position ?? 0,
@@ -447,7 +449,7 @@ export default function GamePage() {
                       </div>
                       <a href={question.link} target="_blank" rel="noopener noreferrer"
                         style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 8, border: '1px solid rgba(0,245,255,0.3)', background: 'rgba(0,245,255,0.07)', color: '#00f5ff', textDecoration: 'none', fontSize: 13, letterSpacing: '0.1em', marginBottom: 10 }}>
-                        ↗ OPEN PROBLEM ON {question.platform.toUpperCase()}
+                        ↗ OPEN PROBLEM
                       </a>
                       <button onClick={submitForReview}
                         style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(0,255,136,0.4)', background: 'rgba(0,255,136,0.08)', color: '#00ff88', cursor: 'pointer', fontSize: 13, letterSpacing: '0.1em', fontWeight: 700 }}>
@@ -472,7 +474,7 @@ export default function GamePage() {
           </div>
 
           {/* ── RIGHT PANEL ── */}
-          <div style={{ width: 220, flexShrink: 0, borderLeft: '1px solid rgba(30,100,255,0.2)', display: 'flex', flexDirection: 'column', padding: '14px 12px', gap: 12, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
+          <div className="right-panel" style={{ width: 220, flexShrink: 0, borderLeft: '1px solid rgba(30,100,255,0.2)', display: 'flex', flexDirection: 'column', padding: '14px 12px', gap: 12, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 10, borderBottom: '1px solid rgba(30,100,255,0.2)' }}>
               <div style={{ width: 3, height: 14, background: myTeam.color, borderRadius: 1 }} />
               <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.12em' }}>{myTeam.name.toUpperCase()}</span>
@@ -485,11 +487,11 @@ export default function GamePage() {
               <div style={{ width: 72, height: 72, borderRadius: 14, background: 'rgba(0,0,0,0.4)', border: `2px solid ${diceUnlocked && !waitingAdmin ? myTeam.color + '90' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: '2.2rem', fontWeight: 900, color: diceUnlocked && !waitingAdmin ? myTeam.color : 'rgba(255,255,255,0.15)', transition: 'all 0.2s', animation: rolling ? 'diceRoll 0.3s linear infinite' : 'none' }}>
                 {diceDisplay}
               </div>
-              <button onClick={rollDice} disabled={!diceUnlocked || rolling || waitingAdmin}
-                style={{ width: '100%', padding: '10px', borderRadius: 8, border: `1px solid ${diceUnlocked && !waitingAdmin ? myTeam.color + '60' : 'rgba(255,255,255,0.06)'}`, background: diceUnlocked && !waitingAdmin ? `${myTeam.color}10` : 'rgba(255,255,255,0.02)', color: diceUnlocked && !waitingAdmin ? myTeam.color : 'rgba(255,255,255,0.2)', cursor: diceUnlocked && !waitingAdmin ? 'pointer' : 'not-allowed', fontSize: 12, letterSpacing: '0.1em', fontWeight: 700, transition: 'all 0.2s' }}>
-                {rolling ? 'ROLLING...' : waitingAdmin ? 'AWAITING ADMIN' : '▶ ROLL DICE'}
+              <button onClick={rollDice} disabled={!diceUnlocked || rolling || waitingAdmin || rolledNum !== null || myPos >= 100}
+                style={{ width: '100%', padding: '10px', borderRadius: 8, border: `1px solid ${diceUnlocked && !waitingAdmin && rolledNum === null && myPos < 100 ? myTeam.color + '60' : 'rgba(255,255,255,0.06)'}`, background: diceUnlocked && !waitingAdmin && rolledNum === null && myPos < 100 ? `${myTeam.color}10` : 'rgba(255,255,255,0.02)', color: diceUnlocked && !waitingAdmin && rolledNum === null && myPos < 100 ? myTeam.color : 'rgba(255,255,255,0.2)', cursor: diceUnlocked && !waitingAdmin && rolledNum === null && myPos < 100 ? 'pointer' : 'not-allowed', fontSize: 12, letterSpacing: '0.1em', fontWeight: 700, transition: 'all 0.2s' }}>
+                {myPos >= 100 ? 'FINISHED' : rolling ? 'ROLLING...' : waitingAdmin ? 'AWAITING ADMIN' : rolledNum !== null ? 'QUESTION ACTIVE' : '▶ ROLL DICE'}
               </button>
-              <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>1 · 2 · 3</div>
+              <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.2em' }}>1-60</div>
             </div>
 
             {/* Activity log */}
@@ -549,6 +551,12 @@ export default function GamePage() {
         @keyframes winnerPulse{0%,100%{transform:scale(1) rotate(-1deg)}50%{transform:scale(1.06) rotate(1deg)}}
         @keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
         input::placeholder{color:rgba(255,255,255,0.2)}
+        @media (max-width: 900px) {
+          .game-container { flex-direction: column !important; overflow-y: auto !important; height: 100vh !important; max-height: none !important; border: none !important; }
+          .left-panel { width: 100% !important; border-right: none !important; border-bottom: 2px solid rgba(30,100,255,0.4) !important; max-height: 40vh !important; flex: none !important; }
+          .center-board { width: 100% !important; flex: none !important; min-height: 100vw !important; padding: 4px !important; }
+          .right-panel { width: 100% !important; border-left: none !important; border-top: 2px solid rgba(30,100,255,0.4) !important; flex: none !important; }
+        }
       `}</style>
     </div>
   );

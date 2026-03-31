@@ -86,12 +86,15 @@ export default function CircuitBackground() {
     function init() {
       const W = canvas!.width, H = canvas!.height;
 
+      const isMobile = W < 768;
+
       // ── Circuit network (subtle base layer) ──
       circuitNodes = []; circuitTraces = [];
-      const cols = Math.ceil(W / 130), rows = Math.ceil(H / 130);
+      const cellSize = isMobile ? 260 : 130;
+      const cols = Math.ceil(W / cellSize), rows = Math.ceil(H / cellSize);
       for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
         circuitNodes.push({
-          x: c * 130 + (Math.random() - 0.5) * 50, y: r * 130 + (Math.random() - 0.5) * 50,
+          x: c * cellSize + (Math.random() - 0.5) * 50, y: r * cellSize + (Math.random() - 0.5) * 50,
           glow: Math.random() < 0.12, color: randCol(), pulse: 0, baseAlpha: 0.06 + Math.random() * 0.08,
         });
       }
@@ -105,13 +108,15 @@ export default function CircuitBackground() {
 
       // ── Particles ──
       particles = [];
-      for (let i = 0; i < 50; i++) {
+      const numParticles = isMobile ? 15 : 50;
+      for (let i = 0; i < numParticles; i++) {
         particles.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, r: Math.random() * 1.2 + 0.3, alpha: Math.random() * 0.35 + 0.05, color: randCol() });
       }
 
-      // ── Binary Trees (2-3 floating BSTs) ──
+      // ── Binary Trees ──
       binaryTrees = [];
-      for (let i = 0; i < 3; i++) {
+      const numTrees = isMobile ? 1 : 3;
+      for (let i = 0; i < numTrees; i++) {
         const bx = 100 + Math.random() * (W - 200);
         const by = 60 + Math.random() * (H - 250);
         binaryTrees.push({
@@ -123,7 +128,8 @@ export default function CircuitBackground() {
 
       // ── Linked Lists (flowing chains) ──
       linkedLists = [];
-      for (let i = 0; i < 4; i++) {
+      const numLists = isMobile ? 1 : 4;
+      for (let i = 0; i < numLists; i++) {
         const nodeCount = 4 + Math.floor(Math.random() * 5);
         const llNodes: LinkedListNode[] = [];
         let lx = -50 + Math.random() * W * 0.3;
@@ -137,7 +143,8 @@ export default function CircuitBackground() {
 
       // ── Graphs with traversal animation ──
       graphs = [];
-      for (let i = 0; i < 2; i++) {
+      const numGraphs = isMobile ? 1 : 2;
+      for (let i = 0; i < numGraphs; i++) {
         const cx = 150 + Math.random() * (W - 300);
         const cy = 150 + Math.random() * (H - 300);
         const gNodes: GraphNode[] = [];
@@ -158,7 +165,8 @@ export default function CircuitBackground() {
 
       // ── Sorting visualization (mini bar charts being sorted) ──
       sortVisuals = [];
-      for (let i = 0; i < 3; i++) {
+      const numSortVis = isMobile ? 1 : 3;
+      for (let i = 0; i < numSortVis; i++) {
         const barCount = 12 + Math.floor(Math.random() * 10);
         const bars: SortBar[] = [];
         for (let j = 0; j < barCount; j++) {
@@ -173,7 +181,8 @@ export default function CircuitBackground() {
 
       // ── Stack visualizations ──
       stacks = [];
-      for (let i = 0; i < 2; i++) {
+      const numStacks = isMobile ? 1 : 2;
+      for (let i = 0; i < numStacks; i++) {
         const blocks: StackBlock[] = [];
         const count = 3 + Math.floor(Math.random() * 3);
         for (let j = 0; j < count; j++) {
@@ -187,7 +196,8 @@ export default function CircuitBackground() {
 
       // ── Big-O / DSA labels floating ──
       bigOLabels = [];
-      for (let i = 0; i < 18; i++) {
+      const numLabels = isMobile ? 6 : 18;
+      for (let i = 0; i < numLabels; i++) {
         bigOLabels.push({
           x: Math.random() * W, y: Math.random() * H,
           text: DSA_LABELS[Math.floor(Math.random() * DSA_LABELS.length)],
@@ -199,7 +209,8 @@ export default function CircuitBackground() {
 
       // ── Hash table visualizations ──
       hashVisuals = [];
-      for (let i = 0; i < 2; i++) {
+      const numHashVis = isMobile ? 0 : 2;
+      for (let i = 0; i < numHashVis; i++) {
         const buckets: HashBucket[] = [];
         for (let j = 0; j < 5; j++) {
           const items: number[] = [];
@@ -214,7 +225,8 @@ export default function CircuitBackground() {
 
       // ── Recursion / fractal trees ──
       recursionTrees = [];
-      for (let i = 0; i < 3; i++) {
+      const numRecursion = isMobile ? 1 : 3;
+      for (let i = 0; i < numRecursion; i++) {
         const rx = 100 + Math.random() * (W - 200);
         const ry = H * 0.3 + Math.random() * H * 0.4;
         recursionTrees.push({
