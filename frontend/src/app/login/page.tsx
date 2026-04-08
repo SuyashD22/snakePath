@@ -49,7 +49,7 @@ export default function LoginPage() {
     if (!adminUsername.trim()) { setError('Please enter a username'); return; }
     if (!adminPassword.trim()) { setError('Please enter a password'); return; }
     if (adminPassword !== ADMIN_PASSWORD) { setError('Invalid administrator password'); return; }
-    sessionStorage.setItem('snakeUser', JSON.stringify({ role: 'administrator', username: adminUsername.trim() }));
+    sessionStorage.setItem('snakeUser', JSON.stringify({ role: 'administrator', username: adminUsername.trim(), authSignature: btoa(ADMIN_PASSWORD) }));
     router.push('/admin');
   };
 
@@ -81,7 +81,7 @@ export default function LoginPage() {
   );
 
   return (
-    <div style={{ background: '#000', minHeight: '100vh', color: '#fff', fontFamily: "'Space Grotesk',sans-serif", overflow: 'hidden' }}>
+    <div className="no-scrollbar" style={{ background: '#000', minHeight: '100vh', color: '#fff', fontFamily: "'Space Grotesk',sans-serif", overflowY: 'auto', overflowX: 'hidden' }}>
       <CircuitBackground />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 20 }}>
 

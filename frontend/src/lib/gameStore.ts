@@ -16,6 +16,15 @@ export interface GameConfig {
   gameStarted: boolean;
 }
 
+export interface Question {
+  id: string;
+  title: string;
+  difficulty: string;
+  platform: string;
+  link: string;
+  description: string;
+}
+
 // Full game state as returned by backend
 export interface GameState {
   numTeams: number;
@@ -58,7 +67,7 @@ export const AVATARS = [
 
 // ─── BROADCAST & API ───────────────────────────────────────
 export const BROADCAST_CHANNEL = 'snl_game';
-const BACKEND_URL = 'http://localhost:8000/api';
+export const BACKEND_URL = 'http://localhost:8000/api';
 
 // Signal to other tabs that the DB was updated
 export function broadcastUpdate() {

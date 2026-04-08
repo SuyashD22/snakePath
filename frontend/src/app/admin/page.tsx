@@ -34,29 +34,45 @@ export default function AdminPage() {
   const [log, setLog] = useState<string[]>([]);
   const [modal, setModal] = useState<ModalCfg | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
   const [loggedInTeams, setLoggedInTeams] = useState<Set<number>>(new Set());
   const [winnerTeam, setWinnerTeam] = useState<TeamConfig | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const fetchLock = useRef(false);
 
   // Helper to re-fetch and map state
   async function fetchAndSync() {
-    const state = await fetchGameState();
-    if (state && state.gameStarted) {
-      setGameConfig({ numTeams: state.numTeams, teams: state.teams, gameStarted: state.gameStarted });
-      setPositions(state.teams.map(t => ({ teamId: t.id, position: t.position || 0 })));
-      setDiceStates(state.teams.map(t => ({ teamId: t.id, diceUnlocked: !!t.diceUnlocked, waitingForApproval: !!t.waitingForApproval })));
-      setPending(state.pendingApprovals);
-      setPhase('game');
-    } else {
-      setPhase('setup');
-      setGameConfig(null);
+    if (fetchLock.current) return;
+    fetchLock.current = true;
+    try {
+      const state = await fetchGameState();
+      if (!state) return; // Prevent wiping UI on network error
+      if (state.gameStarted) {
+        setGameConfig({ numTeams: state.numTeams, teams: state.teams, gameStarted: state.gameStarted });
+        setPositions(state.teams.map(t => ({ teamId: t.id, position: t.position || 0 })));
+        setDiceStates(state.teams.map(t => ({ teamId: t.id, diceUnlocked: !!t.diceUnlocked, waitingForApproval: !!t.waitingForApproval })));
+        setPending(state.pendingApprovals);
+        setPhase('game');
+      } else {
+        setPhase('setup');
+        setGameConfig(null);
+      }
+    } finally {
+      fetchLock.current = false;
     }
   }
 
   // Auth guard & Init
   useEffect(() => {
     const u = (() => { try { return JSON.parse(sessionStorage.getItem('snakeUser') || 'null'); } catch { return null; } })();
-    if (!u || u.role !== 'administrator') { router.push('/login'); return; }
+    if (!u) { router.push('/login'); return; }
+    if (u.role === 'contestant') { router.push('/game'); return; }
+    if (u.role !== 'administrator' || u.authSignature !== btoa('admin@dsa2026')) {
+      sessionStorage.removeItem('snakeUser');
+      router.push('/login');
+      return;
+    }
+    setIsAuth(true);
 
     channelRef.current = new BroadcastChannel(BROADCAST_CHANNEL);
     channelRef.current.onmessage = (e) => {
@@ -70,7 +86,8 @@ export default function AdminPage() {
     };
 
     fetchAndSync();
-    return () => channelRef.current?.close();
+    const interval = setInterval(fetchAndSync, 2000);
+    return () => { channelRef.current?.close(); clearInterval(interval); };
   }, []);
 
   function addLog(msg: string) {
@@ -189,6 +206,8 @@ export default function AdminPage() {
     input: { width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontFamily: "'Space Grotesk',sans-serif", fontSize: 13, outline: 'none', boxSizing: 'border-box' } as React.CSSProperties,
   };
 
+  if (!isAuth) return null;
+
   return (
     <div style={{ background: '#000', minHeight: '100vh', color: '#fff', fontFamily: "'Space Grotesk',sans-serif", overflow: 'hidden' }}>
       <CircuitBackground />
@@ -295,34 +314,43 @@ export default function AdminPage() {
               </div>
               {pending.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.15)', fontSize: 13 }}>// No pending approvals</div>
-              ) : pending.map(a => (
-                <div key={`${a.teamId}-${a.timestamp}`} style={{ padding: 18, marginBottom: 12, borderRadius: 10, border: `1px solid ${a.teamColor}40`, background: `${a.teamColor}08` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: a.teamColor, flexShrink: 0 }} />
-                    <span style={{ fontWeight: 700, color: a.teamColor, fontSize: 14 }}>{a.teamName}</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>rolled</span>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#00f5ff' }}>{a.roll}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
-                      pos {a.fromPosition} → +{MOVE_STEPS[a.questionDifficulty] ?? 2} steps
-                    </span>
-                  </div>
-                  <div style={{ padding: '10px 14px', borderRadius: 7, background: 'rgba(0,0,0,0.3)', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${DIFF_COLOR[a.questionDifficulty]}22`, color: DIFF_COLOR[a.questionDifficulty], letterSpacing: '0.1em', fontWeight: 700 }}>{a.questionDifficulty.toUpperCase()}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{a.questionTitle}</span>
+              ) : (
+                <>
+                  {pending.slice(0, 5).map(a => (
+                    <div key={`${a.teamId}-${a.timestamp}`} style={{ padding: 18, marginBottom: 12, borderRadius: 10, border: `1px solid ${a.teamColor}40`, background: `${a.teamColor}08` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: a.teamColor, flexShrink: 0 }} />
+                        <span style={{ fontWeight: 700, color: a.teamColor, fontSize: 14 }}>{a.teamName}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>rolled</span>
+                        <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#00f5ff' }}>{a.roll}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+                          pos {a.fromPosition} → +{MOVE_STEPS[a.questionDifficulty] ?? 2} steps
+                        </span>
+                      </div>
+                      <div style={{ padding: '10px 14px', borderRadius: 7, background: 'rgba(0,0,0,0.3)', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: `${DIFF_COLOR[a.questionDifficulty]}22`, color: DIFF_COLOR[a.questionDifficulty], letterSpacing: '0.1em', fontWeight: 700 }}>{a.questionDifficulty.toUpperCase()}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{a.questionTitle}</span>
+                        </div>
+                        <a href={a.questionLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'rgba(0,245,255,0.6)', textDecoration: 'none' }}>{a.questionLink}</a>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => approveDice(a)} style={{ flex: 1, padding: '10px', borderRadius: 7, border: '1px solid rgba(0,255,136,0.4)', background: 'rgba(0,255,136,0.08)', color: '#00ff88', cursor: 'pointer', fontSize: 12, letterSpacing: '0.1em', fontWeight: 700 }}>
+                          ✓ APPROVE & MOVE
+                        </button>
+                        <button onClick={() => rejectDice(a)} style={{ padding: '10px 16px', borderRadius: 7, border: '1px solid rgba(255,60,80,0.3)', background: 'transparent', color: 'rgba(255,80,100,0.7)', cursor: 'pointer', fontSize: 12 }}>
+                          ✕ REJECT
+                        </button>
+                      </div>
                     </div>
-                    <a href={a.questionLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'rgba(0,245,255,0.6)', textDecoration: 'none' }}>{a.questionLink}</a>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={() => approveDice(a)} style={{ flex: 1, padding: '10px', borderRadius: 7, border: '1px solid rgba(0,255,136,0.4)', background: 'rgba(0,255,136,0.08)', color: '#00ff88', cursor: 'pointer', fontSize: 12, letterSpacing: '0.1em', fontWeight: 700 }}>
-                      ✓ APPROVE & MOVE
-                    </button>
-                    <button onClick={() => rejectDice(a)} style={{ padding: '10px 16px', borderRadius: 7, border: '1px solid rgba(255,60,80,0.3)', background: 'transparent', color: 'rgba(255,80,100,0.7)', cursor: 'pointer', fontSize: 12 }}>
-                      ✕ REJECT
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  ))}
+                  {pending.length > 5 && (
+                    <div style={{ textAlign: 'center', padding: '14px', borderRadius: 8, border: '1px dashed rgba(0,245,255,0.3)', color: 'rgba(0,245,255,0.6)', fontSize: 11, letterSpacing: '0.15em' }}>
+                      + {pending.length - 5} MORE REQUESTS IN QUEUE
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Team Status + Log */}

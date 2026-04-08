@@ -9,18 +9,26 @@ export default function LeaderboardPage() {
   const [teams, setTeams] = useState<{ id: number; name: string; color: string; avatar: string; position: number }[]>([]);
   const [lastUpdated, setLastUpdated] = useState('');
 
-  async function refresh() {
-    const state = await fetchGameState();
-    if (!state || !state.gameStarted) { setTeams([]); return; }
-    const merged = state.teams.map((t: any) => ({
-      id: t.id, name: t.name, color: t.color, avatar: t.avatar ?? '◆',
-      position: t.position ?? 0,
-    })).sort((a: any, b: any) => b.position - a.position);
-    setTeams(merged);
-    setLastUpdated(new Date().toLocaleTimeString());
-  }
-
   useEffect(() => {
+    let isFetching = false;
+    async function refresh() {
+      if (isFetching) return;
+      isFetching = true;
+      try {
+        const state = await fetchGameState();
+        if (!state) return;
+        if (!state.gameStarted) { setTeams([]); return; }
+        const merged = state.teams.map((t: any) => ({
+          id: t.id, name: t.name, color: t.color, avatar: t.avatar ?? '◆',
+          position: t.position ?? 0,
+        })).sort((a: any, b: any) => b.position - a.position);
+        setTeams(merged);
+        setLastUpdated(new Date().toLocaleTimeString());
+      } finally {
+        isFetching = false;
+      }
+    }
+
     refresh();
     const channel = new BroadcastChannel(BROADCAST_CHANNEL);
     channel.onmessage = (e) => {
@@ -56,10 +64,7 @@ export default function LeaderboardPage() {
             </div>
             <div style={{ fontSize: 14, letterSpacing: '0.3em', color: '#fbbf24', fontWeight: 700, marginTop: 6 }}>DSA EDITION</div>
           </div>
-          <div style={{ textAlign: 'right', fontSize: 11, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.1em' }}>
-            <div>LAST UPDATED</div>
-            <div style={{ color: 'rgba(0,245,255,0.5)', marginTop: 2 }}>{lastUpdated}</div>
-          </div>
+          <div style={{ textAlign: 'right', fontSize: 11, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.1em' }} />
         </div>
 
         {/* Top 3 podium */}

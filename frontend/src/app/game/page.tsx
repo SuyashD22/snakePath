@@ -3,11 +3,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import CircuitBackground from '@/components/CircuitBackground';
 import {
-  GameConfig, TeamConfig, GameState,
-  SNAKES, LADDERS, TEAM_COLORS, BROADCAST_CHANNEL,
+  GameConfig, TeamConfig, GameState, Question,
+  SNAKES, LADDERS, TEAM_COLORS, BROADCAST_CHANNEL, BACKEND_URL,
   fetchGameState, submitRollDB
 } from '@/lib/gameStore';
-import { getQuestionForPosition, Question } from '@/lib/questions';
 
 // ─── BOARD CONSTANTS ──────────────────────────────────────
 const CELL_SIZE = 52;
@@ -144,8 +143,8 @@ function BoardSVG({ players }: { players: { id: number; position: number; color:
     const n=+pos, [gr,gc]=cellToGrid(n);
     const cx=gc*CELL_SIZE+CELL_SIZE/2, cy=gr*CELL_SIZE+CELL_SIZE/2;
     return group.map((p,i)=>{
-      const offX=group.length>1?(i-(group.length-1)/2)*14:0;
-      const ppx=cx+offX, ppy=cy-4, s=1.1;
+      const offX = 0; // Stack perfectly on top of each other
+      const ppx = cx + offX, ppy = cy - 4, s = 1.1;
       return (
         <g key={p.id}>
           <ellipse cx={ppx} cy={ppy+12*s} rx={9*s} ry={2.5*s} fill="rgba(0,0,0,0.35)"/>
@@ -193,6 +192,7 @@ export default function GamePage() {
 
   // We use a ref so the fetch closure can access the latest state without triggering re-runs
   const uiState = useRef({ diceUnlocked, waitingAdmin });
+  const isMutating = useRef(false);
   useEffect(() => { uiState.current = { diceUnlocked, waitingAdmin }; }, [diceUnlocked, waitingAdmin]);
 
   useEffect(() => {
@@ -202,35 +202,47 @@ export default function GamePage() {
 
     channelRef.current = new BroadcastChannel(BROADCAST_CHANNEL);
 
+    let isFetching = false;
+
     async function fetchAndSync() {
-      const state = await fetchGameState();
-      if (state && state.gameStarted) {
-        setWaitingRoom(false);
-        setGameConfig({ numTeams: state.numTeams, teams: state.teams, gameStarted: state.gameStarted });
-        setPositions(state.teams.map(t => ({ teamId: t.id, position: t.position || 0 })));
+      if (isFetching) return;
+      isFetching = true;
+      try {
+        const state = await fetchGameState();
+        if (!state) return; // ignore network drop
         
-        const myTeamData = state.teams.find(t => t.id === u.teamNumber);
-        if (!myTeamData) { router.push('/login'); return; }
-        
-        // Clear question UI if we were waiting but admin replied
-        if (!myTeamData.waitingForApproval && uiState.current.diceUnlocked === false && uiState.current.waitingAdmin === true) {
-            setShowQuestion(false);
-            setRolledNum(null);
-            setLog(l => [`${new Date().toLocaleTimeString()} — Score Updated by Admin`, ...l].slice(0, 30));
+        if (state.gameStarted) {
+          setWaitingRoom(false);
+          setGameConfig({ numTeams: state.numTeams, teams: state.teams, gameStarted: state.gameStarted });
+          setPositions(state.teams.map(t => ({ teamId: t.id, position: t.position || 0 })));
+          
+          const myTeamData = state.teams.find(t => t.id === u.teamNumber);
+          if (!myTeamData) { router.push('/login'); return; }
+          
+          // Clear question UI if we were waiting but admin replied
+          if (!myTeamData.waitingForApproval && uiState.current.diceUnlocked === false && uiState.current.waitingAdmin === true) {
+              setShowQuestion(false);
+              setRolledNum(null);
+              setLog(l => [`${new Date().toLocaleTimeString()} — Score Updated by Admin`, ...l].slice(0, 30));
+          }
+
+          setMyTeam(myTeamData);
+          if (!isMutating.current) {
+            setDiceUnlocked(!!myTeamData.diceUnlocked);
+            setWaitingAdmin(!!myTeamData.waitingForApproval);
+          }
+
+          // Check winner
+          const win = state.teams.find(t => t.position && t.position >= 100);
+          if (win) setWinner(win);
+          
+          // Notify admin of presence
+          channelRef.current?.postMessage({ type: 'CONTESTANT_JOINED', payload: { teamId: u.teamNumber } });
+        } else {
+          setWaitingRoom(true);
         }
-
-        setMyTeam(myTeamData);
-        setDiceUnlocked(!!myTeamData.diceUnlocked);
-        setWaitingAdmin(!!myTeamData.waitingForApproval);
-
-        // Check winner
-        const win = state.teams.find(t => t.position && t.position >= 100);
-        if (win) setWinner(win);
-        
-        // Notify admin of presence
-        channelRef.current?.postMessage({ type: 'CONTESTANT_JOINED', payload: { teamId: u.teamNumber } });
-      } else {
-        setWaitingRoom(true);
+      } finally {
+        isFetching = false;
       }
     }
 
@@ -241,8 +253,11 @@ export default function GamePage() {
     };
 
     fetchAndSync();
+    
+    // Fallback Polling (Cross-device sync without WebSockets)
+    const interval = setInterval(fetchAndSync, 2000);
 
-    return () => channelRef.current?.close();
+    return () => { channelRef.current?.close(); clearInterval(interval); };
   }, []);
 
   function addLog(msg: string) {
@@ -263,7 +278,7 @@ export default function GamePage() {
         setRolledNum(roll);
         setRolling(false);
         addLog(`Rolled ${roll}`);
-        // After 3 seconds show question
+        
         let cd = 3;
         setQuestionCountdown(3);
         const cdIv = setInterval(() => {
@@ -271,9 +286,18 @@ export default function GamePage() {
           setQuestionCountdown(cd);
           if (cd <= 0) {
             clearInterval(cdIv);
-            const q = getQuestionForPosition(Math.max(myPos, 1));
-            setQuestion(q);
-            setShowQuestion(true);
+            fetch(`${BACKEND_URL}/questions/random?position=${Math.max(myPos, 1)}`)
+              .then(res => res.json())
+              .then(q => {
+                setQuestion(q);
+                setShowQuestion(true);
+              })
+              .catch(err => {
+                console.error('Failed to fetch question from DB:', err);
+                addLog('Failed to fetch question. Try again.');
+                setRolling(false);
+                setDiceUnlocked(true);
+              });
           }
         }, 1000);
       }
@@ -291,12 +315,17 @@ export default function GamePage() {
     };
     
     // Optimistic UI updates
+    isMutating.current = true;
     setDiceUnlocked(false);
     setWaitingAdmin(true);
     addLog('Submitted for admin review. Waiting...');
     
-    // Fire and forget so we don't block the UI
-    submitRollDB(approval).catch(console.error);
+    // Fire and forget but clear mutation lock after completion
+    submitRollDB(approval)
+      .catch(console.error)
+      .finally(() => {
+        isMutating.current = false;
+      });
   }
 
   const sortedBoard = gameConfig
@@ -372,7 +401,7 @@ export default function GamePage() {
             </div>
 
             {/* Leaderboard */}
-            <div style={{ padding: 14, flex: 1 }}>
+            <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                 <div style={{ width: 3, height: 12, background: 'rgba(255,200,0,0.9)', borderRadius: 1 }} />
                 <span style={{ fontSize: 9, letterSpacing: '0.18em', color: 'rgba(255,210,0,0.85)', fontWeight: 700 }}>// LEADERBOARD</span>
@@ -398,6 +427,25 @@ export default function GamePage() {
               {sortedBoard.length > 7 && (
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center', paddingTop: 4, letterSpacing: '0.1em' }}>+{sortedBoard.length - 7} more</div>
               )}
+              {(() => {
+                const myRank = sortedBoard.findIndex(t => t.id === myTeam.id);
+                const pos = positions.find(p => p.teamId === myTeam.id)?.position ?? 0;
+                return (
+                  <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div style={{ padding: '8px 10px 8px 14px', borderRadius: 5, position: 'relative', overflow: 'hidden', border: `1px solid ${myTeam.color}55`, background: `${myTeam.color}0a` }}>
+                      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: myTeam.color }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', minWidth: 18 }}>{myRank >= 0 ? myRank + 1 : '-'}.</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, flex: 1, color: myTeam.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myTeam.name} ◄</span>
+                        <span style={{ fontSize: '1rem', fontWeight: 800, color: pos === 0 ? 'rgba(255,255,255,0.15)' : myTeam.color }}>{pos === 0 ? '—' : pos}</span>
+                      </div>
+                      <div style={{ height: 2, background: 'rgba(255,255,255,0.05)' }}>
+                        <div style={{ height: '100%', width: `${pos}%`, background: myTeam.color, transition: 'width 0.6s' }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
