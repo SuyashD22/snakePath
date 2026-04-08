@@ -1,3 +1,4 @@
+import random
 from fastapi import APIRouter, HTTPException
 from database import get_connection, release_connection
 from models import (
@@ -7,8 +8,11 @@ from models import (
 
 router = APIRouter(prefix="/api")
 
+# In-memory question cache to prevent DB connection pool exhaustion on 30 simultaneous rolls
+QUESTIONS_CACHE = None
+
 @router.get("/state", response_model=GameState)
-async def get_state():
+def get_state():
     conn = get_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="DB Error")
@@ -55,7 +59,7 @@ async def get_state():
             release_connection(conn)
 
 @router.post("/admin/setup")
-async def setup_game(setup: GameSetup):
+def setup_game(setup: GameSetup):
     conn = get_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="DB Error")
@@ -89,7 +93,7 @@ async def setup_game(setup: GameSetup):
             release_connection(conn)
 
 @router.post("/admin/reset")
-async def reset_game():
+def reset_game():
     conn = get_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="DB Error")
@@ -109,7 +113,7 @@ async def reset_game():
             release_connection(conn)
 
 @router.post("/team/roll")
-async def log_roll(roll: RollSubmit):
+def log_roll(roll: RollSubmit):
     conn = get_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="DB Error")
@@ -143,7 +147,7 @@ async def log_roll(roll: RollSubmit):
             release_connection(conn)
 
 @router.post("/admin/verdict")
-async def roll_verdict(verdict: VerdictRequest):
+def roll_verdict(verdict: VerdictRequest):
     conn = get_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="DB Error")
@@ -168,3 +172,49 @@ async def roll_verdict(verdict: VerdictRequest):
     finally:
         if conn:
             release_connection(conn)
+
+@router.get("/questions/random")
+def get_random_question(position: int = 0):
+    r = random.random()
+    if position <= 50:
+        difficulty = 'easy' if r < 0.5 else 'medium' if r < 0.8 else 'hard'
+    elif position <= 80:
+        difficulty = 'easy' if r < 0.3 else 'medium' if r < 0.8 else 'hard'
+    else:
+        difficulty = 'easy' if r < 0.2 else 'medium' if r < 0.6 else 'hard'
+
+    global QUESTIONS_CACHE
+    
+    if QUESTIONS_CACHE is None:
+        conn = get_connection()
+        if not conn:
+            raise HTTPException(status_code=500, detail="DB Error")
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, difficulty, platform, link, description FROM questions;")
+            rows = cursor.fetchall()
+            cursor.close()
+            
+            QUESTIONS_CACHE = { 'easy': [], 'medium': [], 'hard': [] }
+            for row in rows:
+                diff = row[2].lower()
+                if diff in QUESTIONS_CACHE:
+                    QUESTIONS_CACHE[diff].append({
+                        "id": row[0], "title": row[1], "difficulty": row[2],
+                        "platform": row[3], "link": row[4], "description": row[5]
+                    })
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            if conn:
+                release_connection(conn)
+                
+    cache_pool = QUESTIONS_CACHE.get(difficulty.lower(), [])
+    if not cache_pool:
+        # Fallback if that specific pool is empty
+        all_questions = QUESTIONS_CACHE['easy'] + QUESTIONS_CACHE['medium'] + QUESTIONS_CACHE['hard']
+        if not all_questions:
+            raise HTTPException(status_code=404, detail="No questions found in memory cache")
+        return random.choice(all_questions)
+        
+    return random.choice(cache_pool)

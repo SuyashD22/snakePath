@@ -8,6 +8,7 @@ from database import get_connection, release_connection, init_pool
 # Load environment variables from .env
 load_dotenv()
 
+import json
 from contextlib import asynccontextmanager
 
 def init_db():
@@ -64,6 +65,31 @@ def init_db():
         );
         """)
         
+        # Table 4: questions
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS questions (
+            id VARCHAR(100) PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            difficulty VARCHAR(50) NOT NULL,
+            platform VARCHAR(50) NOT NULL,
+            link TEXT,
+            description TEXT
+        );
+        """)
+
+        # Ensure questions are seeded
+        cursor.execute("SELECT COUNT(*) FROM questions;")
+        if cursor.fetchone()[0] == 0:
+            if os.path.exists("questions.json"):
+                with open("questions.json", "r", encoding="utf-8") as f:
+                    qs = json.load(f)
+                    for q in qs:
+                        cursor.execute(
+                            "INSERT INTO questions (id, title, difficulty, platform, link, description) VALUES (%s, %s, %s, %s, %s, %s);",
+                            (q["id"], q["title"], q["difficulty"], q["platform"], q["link"], q.get("description", ""))
+                        )
+                print(f"Seeded {len(qs)} questions into database.")
+
         conn.commit()
         cursor.close()
         print("Database schema initialized successfully.")
