@@ -36,6 +36,7 @@ venv.bak/
 *.db-shm
 *.db-wal
 db.sqlite3
+questions.json
 
 # Node.js / Frontend
 node_modules/
