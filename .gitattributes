@@ -1,9 +1,0 @@
-# Force LF line endings for all text files (prevents LF→CRLF warnings on Windows)
-* text=auto eol=lf
-
-# Explicitly set binary files to avoid corruption
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.ico binary
-*.webp binary
